@@ -118,7 +118,51 @@
     if(action==='certificates.generateBatch'){
       const limit=Math.min(25,Math.max(1,Number(data.limite||10)));const eligible=db.participants.filter(x=>x.id_conferencia===data.id_conferencia&&!['CANCELADA','RECUSADA'].includes(x.estado_inscricao)&&(data.exigir_presenca===false||x.data_checkin||x.estado_inscricao==='PRESENTE')).slice(0,limit);let emitted=0,ignored=0;for(const p of eligible){const type=data.tipo||'PARTICIPACAO';const existing=db.certificates.find(x=>x.id_conferencia===data.id_conferencia&&x.id_inscricao===p.id_inscricao&&x.tipo===type&&x.estado==='EMITIDO');if(existing&&!data.regenerar){ignored++;continue;}if(existing)existing.estado='SUBSTITUIDO';db.certificates.push({id_certificado:id('CER'),id_conferencia:data.id_conferencia,id_inscricao:p.id_inscricao,tipo:type,codigo:'CERT-DEMO-'+String(db.certificates.length+1).padStart(6,'0'),ficheiro_url:'',data_emissao:new Date().toISOString(),estado:'EMITIDO'});emitted++;}save(db);return{emitidos:emitted,ignorados:ignored,erros:[],limite:limit};
     }
-    if(action==='dashboard.get'){const regs=db.participants.filter(x=>!data.id_conferencia||x.id_conferencia===data.id_conferencia),pays=db.payments.filter(x=>(!data.id_conferencia||x.id_conferencia===data.id_conferencia)&&x.estado==='CONFIRMADO'),ss=db.sessions.filter(x=>!data.id_conferencia||x.id_conferencia===data.id_conferencia);const dist={};regs.forEach(r=>dist[r.distrito_nome||'Sem distrito']=(dist[r.distrito_nome||'Sem distrito']||0)+1);return{kpis:{participantes:regs.length,confirmadas:regs.filter(x=>['CONFIRMADA','PRESENTE'].includes(x.estado_inscricao)).length,pendentes:regs.filter(x=>['SUBMETIDA','EM_VERIFICACAO','PENDENTE_PAGAMENTO'].includes(x.estado_inscricao)).length,presentes:regs.filter(x=>x.estado_inscricao==='PRESENTE').length,totalDevido:regs.reduce((s,x)=>s+Number(x.total_devido||0),0),totalArrecadado:pays.reduce((s,x)=>s+Number(x.valor||0),0),totalPendente:regs.reduce((s,x)=>s+Number(x.saldo_pendente||0),0),sessoes:ss.length},byDistrict:Object.entries(dist).map(([nome,total])=>({nome,total})),upcomingSessions:ss.slice(0,6),recentPayments:pays.slice(0,6)};}
+    if(action==='dashboard.get'){
+      const conference=db.conferences.find(x=>x.id_conferencia===data.id_conferencia)||db.conferences[0]||{};
+      const regs=db.participants.filter(x=>!data.id_conferencia||x.id_conferencia===data.id_conferencia);
+      const pays=db.payments.filter(x=>(!data.id_conferencia||x.id_conferencia===data.id_conferencia)&&x.estado==='CONFIRMADO');
+      const ss=db.sessions.filter(x=>!data.id_conferencia||x.id_conferencia===data.id_conferencia);
+      const dist={};regs.forEach(r=>dist[r.distrito_nome||'Sem distrito']=(dist[r.distrito_nome||'Sem distrito']||0)+1);
+      const accommodations=db.accommodations.filter(x=>x.id_conferencia===data.id_conferencia);
+      const accommodationIds=new Set(accommodations.map(x=>x.id_alojamento));
+      const accommodationAssignments=db.accommodationAssignments.filter(x=>accommodationIds.has(x.id_alojamento)&&['ATRIBUIDA','HOSPEDADA'].includes(x.estado));
+      const accommodationCapacity=accommodations.reduce((sum,x)=>sum+Number(x.capacidade||0),0);
+      const transportIds=new Set(db.transports.filter(x=>x.id_conferencia===data.id_conferencia).map(x=>x.id_transporte));
+      const transportAssignments=db.transportAssignments.filter(x=>transportIds.has(x.id_transporte)&&x.estado!=='CANCELADA');
+      const mealIds=new Set(db.meals.filter(x=>x.id_conferencia===data.id_conferencia).map(x=>x.id_refeicao));
+      const mealToday=db.mealDeliveries.filter(x=>mealIds.has(x.id_refeicao)&&String(x.data_hora||'').slice(0,10)===date(0)).length;
+      const certs=db.certificates.filter(x=>x.id_conferencia===data.id_conferencia&&x.estado==='EMITIDO');
+      const totalDue=regs.reduce((sum,x)=>sum+Number(x.total_devido||0),0);
+      const totalCollected=pays.reduce((sum,x)=>sum+Number(x.valor||0),0);
+      const totalPending=regs.reduce((sum,x)=>sum+Number(x.saldo_pendente||0),0);
+      const assignedAccommodation=new Set(accommodationAssignments.map(x=>x.id_inscricao));
+      const assignedTransport=new Set(transportAssignments.map(x=>x.id_inscricao));
+      const checkins=regs.filter(x=>x.data_checkin||x.estado_inscricao==='PRESENTE');
+      const alerts=[];
+      const addAlert=(total,texto,vista,severidade='warning')=>{if(total)alerts.push({total,texto:total+' '+texto,vista,severidade});};
+      addAlert(regs.filter(x=>Number(x.saldo_pendente||0)>0).length,'inscrições com valor pendente','payments');
+      addAlert(regs.filter(x=>x.necessita_alojamento&&!assignedAccommodation.has(x.id_inscricao)).length,'participantes aguardam alojamento','accommodations');
+      addAlert(regs.filter(x=>x.necessita_transporte&&!assignedTransport.has(x.id_inscricao)).length,'participantes aguardam transporte','transport');
+      addAlert(ss.filter(x=>!x.id_moderadora&&x.estado!=='CANCELADA').length,'sessões futuras sem moderadora','sessions');
+      addAlert(checkins.filter(x=>!certs.some(c=>c.id_inscricao===x.id_inscricao)).length,'participantes presentes sem certificado','certificates','neutral');
+      const today=new Date().toISOString().slice(0,10);
+      const dayDiff=(a,b)=>{if(!a||!b)return null;return Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000);};
+      return{
+        conference:{...conference,participantes:regs.length,ocupacao_percentual:Number(conference.capacidade||0)?Math.round(regs.length/Number(conference.capacidade)*100):0,dias_para_inicio:dayDiff(today,String(conference.data_inicio||'').slice(0,10)),dias_para_fim:dayDiff(today,String(conference.data_fim||'').slice(0,10))},
+        kpis:{participantes:regs.length,confirmadas:regs.filter(x=>['CONFIRMADA','PRESENTE'].includes(x.estado_inscricao)).length,pendentes:regs.filter(x=>['SUBMETIDA','EM_VERIFICACAO','PENDENTE_PAGAMENTO'].includes(x.estado_inscricao)).length,presentes:checkins.length,totalDevido:totalDue,totalArrecadado:totalCollected,totalPendente:totalPending,sessoes:ss.length,pagamentosConfirmados:pays.length,pagamentosParciais:regs.filter(x=>Number(x.total_pago||0)>0&&Number(x.saldo_pendente||0)>0).length,semPagamento:regs.filter(x=>Number(x.total_devido||0)>0&&Number(x.total_pago||0)<=0).length,progressoFinanceiro:totalDue?Math.round(totalCollected/totalDue*100):0,credenciaisEntregues:regs.filter(x=>x.credencial_entregue).length,checkins:checkins.length,alojadas:accommodationAssignments.length,vagasAlojamento:Math.max(0,accommodationCapacity-accommodationAssignments.length),transporteAtribuido:new Set(transportAssignments.map(x=>x.id_inscricao)).size,refeicoesHoje:mealToday,certificadosEmitidos:new Set(certs.map(x=>x.id_inscricao)).size,materiaisEntregues:db.deliveries.filter(x=>regs.some(r=>r.id_inscricao===x.id_inscricao)).reduce((sum,x)=>sum+Number(x.quantidade||0),0)},
+        alerts,
+        byDistrict:Object.entries(dist).map(([nome,total])=>({nome,total})).sort((a,b)=>b.total-a.total),
+        todaySessions:ss.filter(x=>x.data===today).slice(0,8),
+        upcomingSessions:ss.filter(x=>String(x.data||'')>=today).slice(0,8),
+        recentActivity:[
+          {descricao:'Inscrição registada',utilizador:'Secretaria',data_hora:new Date().toISOString()},
+          {descricao:'Pagamento confirmado',utilizador:'Tesouraria',data_hora:new Date(Date.now()-3600000).toISOString()},
+          {descricao:'Alojamento atribuído',utilizador:'Logística',data_hora:new Date(Date.now()-7200000).toISOString()}
+        ],
+        recentPayments:pays.slice(0,6)
+      };
+    }
     throw new Error('Acção não implementada no sandbox: '+action);
   };
 })();
