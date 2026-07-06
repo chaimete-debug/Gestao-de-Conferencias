@@ -232,3 +232,46 @@
     throw new Error('Acção não implementada no sandbox: '+action);
   };
 })();
+
+
+/* Comunicações v2.4 — extensão isolada do sandbox. */
+(function(){
+  const originalSandboxApi=window.sandboxApi;
+  const KEY='cmnm_sandbox_communications_v24';
+  const defaults=()=>({
+    templates:[
+      {id_modelo:'INSCRICAO_CONFIRMADA',codigo:'INSCRICAO_CONFIRMADA',nome:'Inscrição confirmada',canal:'WHATSAPP',tipo:'INSCRICAO',assunto:'Inscrição confirmada — {conferencia}',mensagem:'Olá, {primeiro_nome}. A sua inscrição {numero_inscricao} na {conferencia} está confirmada.',activo:true},
+      {id_modelo:'PAGAMENTO_PENDENTE',codigo:'PAGAMENTO_PENDENTE',nome:'Lembrete de pagamento',canal:'WHATSAPP',tipo:'PAGAMENTO',assunto:'Pagamento pendente',mensagem:'Olá, {primeiro_nome}. O seu saldo pendente é {saldo_pendente}.',activo:true},
+      {id_modelo:'LEMBRETE_CONFERENCIA',codigo:'LEMBRETE_CONFERENCIA',nome:'Lembrete da conferência',canal:'EMAIL',tipo:'LEMBRETE',assunto:'Lembrete — {conferencia}',mensagem:'Cara {nome},\nA {conferencia} decorrerá em {local}.',activo:true}
+    ],campaigns:[],recipients:[]
+  });
+  const load=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')||defaults();}catch{return defaults();}};
+  const save=db=>localStorage.setItem(KEY,JSON.stringify(db));
+  const filtersOf=data=>data.filters||(typeof data.filtros_json==='string'?(()=>{try{return JSON.parse(data.filtros_json)}catch{return{}}})():data.filtros_json)||{};
+  const money=v=>new Intl.NumberFormat('pt-MZ',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(v||0))+' MTn';
+  const personalize=(text,r,c)=>String(text||'').replace(/\{([a-zA-Z0-9_]+)\}/g,(m,k)=>({nome:r.nome_completo,primeiro_nome:String(r.nome_completo||'').split(' ')[0],numero_inscricao:r.numero_inscricao,conferencia:c.nome,local:c.local,data_inicio:c.data_inicio,data_fim:c.data_fim,saldo_pendente:money(r.saldo_pendente),igreja:r.igreja_nome,distrito:r.distrito_nome}[k]??m));
+  const audience=async data=>{
+    const res=await originalSandboxApi('participants.list',{id_conferencia:data.id_conferencia,pageSize:500});let rows=res.items||[];const f=filtersOf(data);
+    Object.entries({id_distrito:'id_distrito',id_igreja:'id_igreja',id_categoria:'id_categoria',estado_inscricao:'estado_inscricao',estado_pagamento:'estado_pagamento'}).forEach(([fk,rk])=>{if(f[fk])rows=rows.filter(r=>String(r[rk])===String(f[fk]));});
+    if(f.saldo_pendente==='SIM')rows=rows.filter(r=>Number(r.saldo_pendente||0)>0);if(f.saldo_pendente==='NAO')rows=rows.filter(r=>Number(r.saldo_pendente||0)<=0);
+    if(f.checkin==='PRESENTE')rows=rows.filter(r=>r.data_checkin||r.estado_inscricao==='PRESENTE');if(f.checkin==='AUSENTE')rows=rows.filter(r=>!r.data_checkin&&r.estado_inscricao!=='PRESENTE');
+    if(f.necessita_alojamento==='SIM')rows=rows.filter(r=>r.necessita_alojamento);if(f.necessita_alojamento==='NAO')rows=rows.filter(r=>!r.necessita_alojamento);
+    if(f.necessita_transporte==='SIM')rows=rows.filter(r=>r.necessita_transporte);if(f.necessita_transporte==='NAO')rows=rows.filter(r=>!r.necessita_transporte);
+    if(f.search){const q=String(f.search).toLowerCase();rows=rows.filter(r=>[r.nome_completo,r.numero_inscricao,r.telefone,r.email].some(v=>String(v||'').toLowerCase().includes(q)));}
+    const valid=rows.filter(r=>data.canal==='EMAIL'?r.email:r.telefone);return{rows:valid,excluded:rows.length-valid.length};
+  };
+  window.sandboxApi=async function(action,data={}){
+    if(!String(action).startsWith('communications.'))return originalSandboxApi(action,data);
+    const db=load();
+    if(action==='communications.templates.list')return db.templates.filter(x=>x.activo!==false);
+    if(action==='communications.templates.save'){const id=data.id_modelo||'MOD-'+Date.now();const rec={...data,id_modelo:id,codigo:data.codigo||id,activo:true};const i=db.templates.findIndex(x=>x.id_modelo===id);i>=0?db.templates[i]=rec:db.templates.push(rec);save(db);return rec;}
+    if(action==='communications.preview'){const a=await audience(data);const look=await originalSandboxApi('lookups.get',{});const c=(look.conferences||[]).find(x=>x.id_conferencia===data.id_conferencia)||{};return{total:a.rows.length,excluidas_sem_contacto:a.excluded,segmento:'Segmento seleccionado',samples:a.rows.slice(0,5).map(r=>({id_inscricao:r.id_inscricao,nome:r.nome_completo,contacto:data.canal==='EMAIL'?r.email:r.telefone,assunto:personalize(data.assunto,r,c),mensagem:personalize(data.mensagem,r,c)}))};}
+    if(action==='communications.save'){const a=await audience(data);const id=data.id_comunicacao||'COM-'+Date.now();const old=db.campaigns.find(x=>x.id_comunicacao===id)||{};const rec={...old,...data,id_comunicacao:id,filtros_json:JSON.stringify(filtersOf(data)),segmento:'Segmento seleccionado',destinatarios:a.rows.length,total_destinatarios:a.rows.length,enviados:old.enviados||0,falhados:old.falhados||0,estado:data.agendada_para?'AGENDADA':'RASCUNHO',criado_por:'USR-DEMO',criado_por_nome:'Administradora de Demonstração',criado_em:old.criado_em||new Date().toISOString(),actualizado_em:new Date().toISOString()};delete rec.filters;const i=db.campaigns.findIndex(x=>x.id_comunicacao===id);i>=0?db.campaigns[i]=rec:db.campaigns.push(rec);save(db);return rec;}
+    if(action==='communications.list'){const rows=db.campaigns.filter(x=>!data.id_conferencia||x.id_conferencia===data.id_conferencia).sort((a,b)=>String(b.criado_em).localeCompare(String(a.criado_em)));return{items:rows,summary:{total:rows.length,rascunhos:rows.filter(x=>x.estado==='RASCUNHO').length,preparadas:rows.filter(x=>['PREPARADA','AGENDADA','PARCIAL'].includes(x.estado)).length,enviadas:rows.filter(x=>x.estado==='ENVIADA').length,destinatarios:rows.reduce((a,x)=>a+Number(x.total_destinatarios||0),0)}};}
+    if(action==='communications.send'){const campaign=db.campaigns.find(x=>x.id_comunicacao===data.id_comunicacao);if(!campaign)throw new Error('Comunicação não encontrada.');let recs=db.recipients.filter(x=>x.id_comunicacao===campaign.id_comunicacao);if(!recs.length){const a=await audience({...campaign,filters:filtersOf(campaign)});const look=await originalSandboxApi('lookups.get',{});const c=(look.conferences||[]).find(x=>x.id_conferencia===campaign.id_conferencia)||{};recs=a.rows.map((r,i)=>({id_destinatario:'DEST-'+Date.now()+'-'+i,id_comunicacao:campaign.id_comunicacao,id_inscricao:r.id_inscricao,nome:r.nome_completo,canal:campaign.canal,contacto:campaign.canal==='EMAIL'?r.email:r.telefone,assunto_personalizado:personalize(campaign.assunto,r,c),mensagem_personalizada:personalize(campaign.mensagem,r,c),estado:'PENDENTE'}));db.recipients.push(...recs);}if(campaign.canal==='EMAIL')recs.forEach(r=>r.estado='ENVIADO');campaign.enviados=recs.filter(r=>r.estado==='ENVIADO').length;campaign.falhados=0;campaign.estado=campaign.canal==='EMAIL'?'ENVIADA':'PREPARADA';save(db);return{total:recs.length,enviados:campaign.enviados,falhados:0,pendentes:recs.filter(r=>r.estado==='PENDENTE').length,modo_manual:campaign.canal!=='EMAIL'};}
+    if(action==='communications.recipients'){const campaign=db.campaigns.find(x=>x.id_comunicacao===data.id_comunicacao);const rows=db.recipients.filter(x=>x.id_comunicacao===data.id_comunicacao).map(r=>({...r,whatsapp_url:r.canal==='WHATSAPP'?`https://wa.me/258${String(r.contacto||'').replace(/\D/g,'').slice(-9)}?text=${encodeURIComponent(r.mensagem_personalizada||'')}`:'',sms_url:r.canal==='SMS'?`sms:${String(r.contacto||'').replace(/\D/g,'')}?body=${encodeURIComponent(r.mensagem_personalizada||'')}`:''}));return{items:rows,total:rows.length,campaign,progress:{total:rows.length,enviados:rows.filter(x=>x.estado==='ENVIADO').length,falhados:rows.filter(x=>x.estado==='ERRO').length,pendentes:rows.filter(x=>x.estado==='PENDENTE').length}};}
+    if(action==='communications.markRecipient'){const r=db.recipients.find(x=>x.id_destinatario===data.id_destinatario);if(r)r.estado=data.estado;save(db);return{ok:true};}
+    if(action==='communications.cancel'){const c=db.campaigns.find(x=>x.id_comunicacao===data.id_comunicacao);if(c)c.estado='CANCELADA';save(db);return{cancelled:true};}
+    throw new Error('Acção de comunicação não implementada no sandbox: '+action);
+  };
+})();
