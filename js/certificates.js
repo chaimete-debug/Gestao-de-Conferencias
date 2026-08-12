@@ -12,6 +12,7 @@ Views.certificates = async function () {
     <div class="form-grid certificate-generate-grid">
       <label>Participante<input id="certificate-query" autocomplete="off" placeholder="QR, inscrição, nome ou telefone"></label>
       <label>Tipo<select id="certificate-type">${certificateTypeOptions('PARTICIPACAO')}</select></label>
+      <label>Idioma<select id="certificate-language"><option value="AUTO">Automático</option>${[['pt','Português'],['en','English']].map(([value,label])=>UI.option(value,label)).join('')}</select></label>
       <label class="check-inline span-2"><input id="certificate-require-attendance" type="checkbox" checked> Exigir check-in na conferência</label>
     </div>
     <div class="page-actions logistics-actions"><button id="certificate-scan" class="btn btn-secondary">Ler QR</button><button id="certificate-generate" class="btn btn-primary">Gerar certificado</button></div>
@@ -68,7 +69,8 @@ async function generateCertificate() {
       id_conferencia: App.state.conferenceId,
       id_inscricao: participant.id_inscricao,
       tipo: document.getElementById('certificate-type').value,
-      exigir_presenca: document.getElementById('certificate-require-attendance').checked
+      exigir_presenca: document.getElementById('certificate-require-attendance').checked,
+      idioma: document.getElementById('certificate-language').value
     });
     const existingText = result.alreadyExists ? 'O certificado já existia.' : 'Certificado gerado com sucesso.';
     document.getElementById('certificate-feedback').innerHTML = `<div class="attendance-success"><strong>${UI.escape(participant.nome_completo)}</strong><span>${existingText}</span><small>${UI.escape(result.codigo || '')}</small>${result.ficheiro_url ? `<a class="btn btn-secondary btn-sm certificate-open-link" href="${UI.escape(result.ficheiro_url)}" target="_blank" rel="noopener">Abrir certificado</a>` : ''}</div>`;
@@ -87,6 +89,7 @@ function certificateBatchModal() {
     submitText: 'Gerar certificados',
     body: `<div class="form-grid">
       <label>Tipo<select name="tipo">${certificateTypeOptions('PARTICIPACAO')}</select></label>
+      <label>Idioma<select name="idioma"><option value="AUTO">Automático</option>${[['pt','Português'],['en','English']].map(([value,label])=>UI.option(value,label)).join('')}</select></label>
       <label>Quantidade máxima<select name="limite">${[5,10,15,20,25].map(value => UI.option(String(value), `${value} certificados`, '10')).join('')}</select></label>
       <label class="check-inline span-2"><input name="exigir_presenca" type="checkbox" checked> Gerar somente para participantes com check-in</label>
       <label class="check-inline span-2"><input name="regenerar" type="checkbox"> Substituir certificados já emitidos do mesmo tipo</label>

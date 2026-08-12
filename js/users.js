@@ -37,6 +37,7 @@ function usersTable(rows) {
             <th>Perfil</th>
             <th>Âmbito de acesso</th>
             <th>Contacto</th>
+            <th>Idioma</th>
             <th>Estado</th>
             <th>Acções</th>
           </tr>
@@ -57,6 +58,7 @@ function usersTable(rows) {
                 <br>
                 <small>${UI.escape(user.telefone || '')}</small>
               </td>
+              <td>${UI.escape(user.idioma_preferido === 'en' ? 'English' : 'Português')}</td>
               <td>${UI.status(user.activo ? 'ACTIVO' : 'INACTIVO')}</td>
               <td>
                 <button class="btn btn-secondary btn-sm edit-user" data-id="${UI.escape(user.id_utilizador)}">Editar</button>
@@ -118,6 +120,13 @@ function userModal(user = {}) {
         <label>
           Telefone
           <input name="telefone" value="${UI.escape(user.telefone || '')}">
+        </label>
+
+        <label>
+          Idioma preferido
+          <select name="idioma_preferido">
+            ${[['pt','Português'],['en','Inglês']].map(([value,label]) => UI.option(value, label, user.idioma_preferido || 'pt')).join('')}
+          </select>
         </label>
 
         <label>

@@ -55,6 +55,7 @@ function communicationComposer_(lookups, templates) {
       <div class="form-grid communication-main-fields">
         <label>Canal<select name="canal" id="communication-channel" required>${['WHATSAPP','EMAIL','SMS'].map(x=>UI.option(x,x)).join('')}</select></label>
         <label>Tipo<select name="tipo">${['GERAL','INSCRICAO','PAGAMENTO','LEMBRETE','ALOJAMENTO','TRANSPORTE','PROGRAMA','CERTIFICADO'].map(x=>UI.option(x,x.replaceAll('_',' '))).join('')}</select></label>
+        <label>Idioma<select name="idioma" id="communication-language"><option value="AUTO">Automático</option>${[['pt','Português'],['en','English']].map(([value,label])=>UI.option(value,label)).join('')}</select></label>
         <label class="span-2">Modelo<select id="communication-template"><option value="">Sem modelo</option>${templates.map(x=>UI.option(x.id_modelo,x.nome)).join('')}</select></label>
         <label class="span-2 communication-subject-field">Assunto<input name="assunto" id="communication-subject" placeholder="Obrigatório para correio electrónico"></label>
         <label class="span-2">Agendar envio por e-mail<input name="agendada_para" type="datetime-local" id="communication-schedule"><small>Deixe em branco para envio imediato ou preparação manual.</small></label>
@@ -73,6 +74,7 @@ function communicationComposer_(lookups, templates) {
         <label>Alojamento atribuído<select name="tem_alojamento"><option value="">Todas</option>${UI.option('SIM','Sim')}${UI.option('NAO','Não')}</select></label>
         <label>Solicitou transporte<select name="necessita_transporte"><option value="">Todas</option>${UI.option('SIM','Sim')}${UI.option('NAO','Não')}</select></label>
         <label>Transporte atribuído<select name="tem_transporte"><option value="">Todas</option>${UI.option('SIM','Sim')}${UI.option('NAO','Não')}</select></label>
+        <label>Idioma preferido<select name="idioma_preferido"><option value="">Todos</option>${[['pt','Português'],['en','English']].map(([value,label])=>UI.option(value,label)).join('')}</select></label>
         <label>Pesquisa<input name="search" placeholder="Nome, inscrição ou contacto"></label>
       </div>
       <div class="communication-form-actions"><button type="button" class="btn btn-secondary" id="communication-preview">Pré-visualizar destinatárias</button><button type="submit" class="btn btn-primary">Guardar comunicação</button></div>
@@ -106,6 +108,7 @@ function communicationBindComposer_(templates) {
     form.elements.tipo.value = item.tipo || 'GERAL';
     form.elements.assunto.value = item.assunto || '';
     form.elements.mensagem.value = item.mensagem || '';
+    if(form.elements.idioma && item.idioma) form.elements.idioma.value = item.idioma;
     updateChannel();
   });
 
@@ -146,7 +149,7 @@ function communicationBindComposer_(templates) {
 function communicationFormPayload_() {
   const form = document.getElementById('communication-form');
   const raw = Object.fromEntries(new FormData(form).entries());
-  const filterKeys = ['id_distrito','id_igreja','id_categoria','estado_inscricao','estado_pagamento','saldo_pendente','checkin','necessita_alojamento','tem_alojamento','necessita_transporte','tem_transporte','search'];
+  const filterKeys = ['id_distrito','id_igreja','id_categoria','estado_inscricao','estado_pagamento','saldo_pendente','checkin','necessita_alojamento','tem_alojamento','necessita_transporte','tem_transporte','idioma_preferido','search'];
   const filters = {};
   filterKeys.forEach(key => { if (raw[key]) filters[key] = raw[key]; delete raw[key]; });
   raw.id_conferencia = App.state.conferenceId;
@@ -178,6 +181,7 @@ function communicationLoadCampaign_(id) {
   form.elements.id_comunicacao.value = row.id_comunicacao;
   form.elements.canal.value = row.canal || 'WHATSAPP';
   form.elements.tipo.value = row.tipo || 'GERAL';
+  if(form.elements.idioma) form.elements.idioma.value = row.idioma || 'AUTO';
   form.elements.assunto.value = row.assunto || '';
   form.elements.mensagem.value = row.mensagem || '';
   form.elements.agendada_para.value = communicationDateTimeLocal_(row.agendada_para);
@@ -194,7 +198,7 @@ function communicationResetComposer_() {
 
 async function communicationSaveTemplateFromComposer_() {
   const form=document.getElementById('communication-form');
-  UI.modal({title:'Guardar modelo de comunicação',body:`<div class="form-grid"><label>Nome do modelo<input name="nome" required></label><label>Canal<select name="canal">${['WHATSAPP','EMAIL','SMS'].map(x=>UI.option(x,x,form.elements.canal.value)).join('')}</select></label><label>Tipo<select name="tipo">${['GERAL','INSCRICAO','PAGAMENTO','LEMBRETE','ALOJAMENTO','TRANSPORTE','PROGRAMA','CERTIFICADO'].map(x=>UI.option(x,x,form.elements.tipo.value)).join('')}</select></label><label class="span-2">Assunto<input name="assunto" value="${UI.escape(form.elements.assunto.value)}"></label><label class="span-2">Mensagem<textarea name="mensagem" required>${UI.escape(form.elements.mensagem.value)}</textarea></label></div>`,onSubmit:async data=>{await Api.request('communications.templates.save',data);UI.toast('Modelo guardado.');App.render('communications');}});
+  UI.modal({title:'Guardar modelo de comunicação',body:`<div class="form-grid"><label>Nome do modelo<input name="nome" required></label><label>Idioma<select name="idioma"><option value="AUTO">Automático</option>${[['pt','Português'],['en','English']].map(([value,label])=>UI.option(value,label)).join('')}</select></label><label>Canal<select name="canal">${['WHATSAPP','EMAIL','SMS'].map(x=>UI.option(x,x,form.elements.canal.value)).join('')}</select></label><label>Tipo<select name="tipo">${['GERAL','INSCRICAO','PAGAMENTO','LEMBRETE','ALOJAMENTO','TRANSPORTE','PROGRAMA','CERTIFICADO'].map(x=>UI.option(x,x,form.elements.tipo.value)).join('')}</select></label><label class="span-2">Assunto<input name="assunto" value="${UI.escape(form.elements.assunto.value)}"></label><label class="span-2">Mensagem<textarea name="mensagem" required>${UI.escape(form.elements.mensagem.value)}</textarea></label></div>`,onSubmit:async data=>{await Api.request('communications.templates.save',data);UI.toast('Modelo guardado.');App.render('communications');}});
 }
 
 async function communicationSend_(id) {
