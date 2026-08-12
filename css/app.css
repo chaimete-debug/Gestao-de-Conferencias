@@ -77,3 +77,15 @@ label{display:grid;gap:7px;font-size:.86rem;font-weight:700}input,select,textare
 .language-select{border:1px solid rgba(76,29,95,.25);border-radius:999px;background:#fff;color:var(--primary);font-weight:800;padding:.45rem .7rem;min-height:34px;cursor:pointer}
 .topbar-language{min-width:70px}
 @media (max-width:720px){.language-floating{right:10px;bottom:10px}.topbar-language{max-width:64px;padding:.35rem .45rem}}
+
+/* v2.7.1 — desempenho */
+.table-meta{margin:0 0 10px;font-size:12px;}
+.pager{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-top:14px;}
+@media(max-width:720px){.pager{justify-content:center;flex-wrap:wrap}.table-meta{text-align:center}}
+
+/* v2.7.2 — ecrã inicial de instalação PWA */
+.pwa-entry-view{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;padding:22px;background:linear-gradient(145deg,rgba(49,16,59,.96),rgba(100,25,79,.96) 48%,rgba(176,42,115,.96));backdrop-filter:blur(8px)}
+.pwa-entry-card{width:min(520px,100%);border-radius:26px;background:#fff;padding:28px;box-shadow:0 28px 90px rgba(0,0,0,.32);border:1px solid rgba(255,255,255,.5)}
+.pwa-entry-brand{display:flex;align-items:center;gap:12px;margin-bottom:18px;color:var(--primary)}
+.pwa-entry-brand strong,.pwa-entry-brand span{display:block}.pwa-entry-brand span{font-size:.82rem;color:var(--muted)}
+.pwa-entry-card h1{margin:0 0 10px;font-size:clamp(1.8rem,6vw,2.65rem);color:var(--primary);line-height:1.05}.pwa-entry-card p{color:var(--muted);line-height:1.55;margin:0 0 18px}.pwa-entry-actions{display:grid;grid-template-columns:1fr;gap:12px;margin:22px 0 14px}.pwa-entry-actions .btn{width:100%;justify-content:center;min-height:48px;font-weight:850}.btn-soft{background:#f5edf6;color:var(--primary);border:1px solid rgba(76,29,95,.15)}.btn-soft:hover{background:#efe1f1}.pwa-help-btn{border:0;background:transparent;color:var(--primary);font-weight:800;text-decoration:underline;cursor:pointer;width:100%;padding:8px}.pwa-install-help{margin-top:14px;padding:14px;border:1px solid var(--border);border-radius:14px;background:#faf7fa}.pwa-install-help strong{display:block;margin-bottom:8px;color:var(--primary)}.pwa-install-help p{font-size:.9rem;margin:8px 0}.pwa-entry-view.hidden{display:none!important}@media(min-width:620px){.pwa-entry-actions{grid-template-columns:1fr 1fr}}@media(max-width:480px){.pwa-entry-card{padding:22px;border-radius:22px}.pwa-entry-actions{gap:10px}.pwa-entry-actions .btn{min-height:52px}}
