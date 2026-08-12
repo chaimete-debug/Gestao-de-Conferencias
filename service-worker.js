@@ -1,10 +1,14 @@
-const CACHE_NAME = 'cmnm-v15-performance-v271';
+const CACHE_NAME = 'cmnm-v16-pwa-install-v272';
 const ASSETS = [
   './',
   './index.html',
   './css/app.css',
   './manifest.json',
+  './assets/icons/icon.svg',
+  './assets/icons/icon-512.png',
+  './assets/icons/icon-192.png',
   './js/config.js',
+  './js/pwa-install.js',
   './js/i18n.js',
   './js/ui.js',
   './js/api.js',
