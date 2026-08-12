@@ -1,10 +1,11 @@
-const CACHE_NAME = 'cmnm-v13-menu-administracao';
+const CACHE_NAME = 'cmnm-v14-bilinguismo-v27';
 const ASSETS = [
   './',
   './index.html',
   './css/app.css',
   './manifest.json',
   './js/config.js',
+  './js/i18n.js',
   './js/ui.js',
   './js/api.js',
   './js/sandbox.js',
