@@ -13,6 +13,32 @@
   <div class="language-floating" aria-label="Idioma"><select data-language-select class="language-select"><option value="pt">Português</option><option value="en">English</option></select></div>
 
 
+
+
+  <section id="pwa-entry-view" class="pwa-entry-view hidden" aria-label="Instalação da aplicação">
+    <div class="pwa-entry-card">
+      <div class="pwa-entry-brand">
+        <div class="brand-mark">MN</div>
+        <div>
+          <strong data-short-name>Mulheres Nazarenas</strong>
+          <span>Conferência de Mulheres Nazarenas</span>
+        </div>
+      </div>
+      <h1>Como deseja continuar?</h1>
+      <p>Instale a aplicação no telemóvel para aceder mais rapidamente, mesmo quando a rede estiver instável, ou abra directamente no navegador.</p>
+      <div class="pwa-entry-actions">
+        <button id="pwa-install-btn" class="btn btn-primary" type="button">Instalar no telemóvel</button>
+        <button id="pwa-open-btn" class="btn btn-soft" type="button">Abrir o app</button>
+      </div>
+      <button id="pwa-help-btn" class="pwa-help-btn" type="button">Como instalar manualmente?</button>
+      <div id="pwa-install-help" class="pwa-install-help hidden">
+        <strong>Instalação manual</strong>
+        <p><b>Android/Chrome:</b> toque no menu ⋮ e escolha <b>Adicionar ao ecrã principal</b> ou <b>Instalar aplicação</b>.</p>
+        <p><b>iPhone/Safari:</b> toque no botão de partilha e escolha <b>Adicionar ao Ecrã Principal</b>.</p>
+      </div>
+    </div>
+  </section>
+
   <section id="public-evaluation-view" class="public-evaluation-view hidden">
     <div class="public-evaluation-shell">
       <div class="public-evaluation-brand"><div class="brand-mark">MN</div><div><strong data-short-name>Mulheres Nazarenas</strong><span data-i18n="nav.evaluationClosure">Avaliação da conferência</span></div></div>
@@ -97,6 +123,7 @@
 
   <div id="modal-root"></div>
   <script src="js/config.js"></script>
+  <script src="js/pwa-install.js"></script>
   <script src="js/i18n.js"></script>
   <script src="js/sandbox.js"></script>
   <script src="js/api.js"></script>
