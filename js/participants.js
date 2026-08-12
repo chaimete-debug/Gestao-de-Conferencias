@@ -1,30 +1,43 @@
 Views.participants = async function(){
-  const result=await Api.request('participants.list',{id_conferencia:App.state.conferenceId,pageSize:500});
+  App.state.participantFilters = { search:'', estado_inscricao:'', page:1, pageSize:100 };
+  const result = await Api.request('participants.list',{id_conferencia:App.state.conferenceId,pageSize:100,page:1});
   App.state.participants=result.items;
+  App.state.participantPage=result;
   App.container.innerHTML=`<div class="page-header"><div><span class="eyebrow">Inscrições e credenciação</span><h1>Participantes</h1><p class="muted">Registo, validação, situação financeira e check-in.</p></div><div class="page-actions"><button id="new-participant" class="btn btn-primary">Nova inscrição</button></div></div>
-  <div class="toolbar"><label>Pesquisar<input id="participant-search" placeholder="Nome, telefone ou número de inscrição"></label><label class="compact">Estado<select id="participant-status"><option value="">Todos</option>${['SUBMETIDA','EM_VERIFICACAO','CONFIRMADA','PENDENTE_PAGAMENTO','CANCELADA','PRESENTE'].map(x=>UI.option(x,x.replaceAll('_',' '))).join('')}</select></label></div><div id="participants-table">${participantsTable(result.items)}</div>`;
+  <div class="toolbar"><label>Pesquisar<input id="participant-search" placeholder="Nome, telefone ou número de inscrição"></label><label class="compact">Estado<select id="participant-status"><option value="">Todos</option>${['SUBMETIDA','EM_VERIFICACAO','CONFIRMADA','PENDENTE_PAGAMENTO','CANCELADA','PRESENTE'].map(x=>UI.option(x,x.replaceAll('_',' '))).join('')}</select></label></div><div id="participants-table">${participantsTable(result.items,result)}</div>`;
   document.getElementById('new-participant').onclick=()=>participantModal();
   let timer;
-  document.getElementById('participant-search').oninput=e=>{clearTimeout(timer);timer=setTimeout(()=>reloadParticipants(e.target.value,document.getElementById('participant-status').value),250)};
-  document.getElementById('participant-status').onchange=e=>reloadParticipants(document.getElementById('participant-search').value,e.target.value);
+  document.getElementById('participant-search').oninput=e=>{clearTimeout(timer);timer=setTimeout(()=>reloadParticipants(e.target.value,document.getElementById('participant-status').value,1),300)};
+  document.getElementById('participant-status').onchange=e=>reloadParticipants(document.getElementById('participant-search').value,e.target.value,1);
   bindParticipantActions();
 };
 
-async function reloadParticipants(search,status){
-  const r=await Api.request('participants.list',{id_conferencia:App.state.conferenceId,search,estado_inscricao:status,pageSize:500});
+async function reloadParticipants(search,status,page=1){
+  const pageSize=100;
+  const r=await Api.request('participants.list',{id_conferencia:App.state.conferenceId,search,estado_inscricao:status,page,pageSize});
   App.state.participants=r.items;
-  document.getElementById('participants-table').innerHTML=participantsTable(r.items);
+  App.state.participantPage=r;
+  App.state.participantFilters={search,estado_inscricao:status,page,pageSize};
+  document.getElementById('participants-table').innerHTML=participantsTable(r.items,r);
   bindParticipantActions();
 }
 
-function participantsTable(rows){
+function participantsTable(rows,meta={}){
   if(!rows.length)return UI.empty();
-  return `<div class="table-wrap"><table><thead><tr><th>N.º inscrição</th><th>Participante</th><th>Distrito / Igreja</th><th>Categoria</th><th>Pagamento</th><th>Inscrição</th><th>Acções</th></tr></thead><tbody>${rows.map(r=>`<tr><td><strong>${UI.escape(r.numero_inscricao)}</strong></td><td><strong>${UI.escape(r.nome_completo)}</strong><br><small>${UI.escape(r.telefone||'')}</small></td><td>${UI.escape(r.distrito_nome||'—')}<br><small>${UI.escape(r.igreja_nome||'—')}</small></td><td>${UI.escape(r.categoria_nome||r.id_categoria||'—')}</td><td>${UI.status(r.estado_pagamento)}<br><small>${UI.money(r.total_pago)} / ${UI.money(r.total_devido)}</small></td><td>${UI.status(r.estado_inscricao)}</td><td><div class="actions"><button class="btn btn-secondary btn-sm edit-participant" data-id="${r.id_inscricao}">Editar</button>${r.estado_inscricao!=='PRESENTE'?`<button class="btn btn-primary btn-sm checkin-participant" data-id="${r.id_inscricao}">Check-in</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`;
+  const start=((meta.page||1)-1)*(meta.pageSize||rows.length)+1;
+  const end=start+rows.length-1;
+  return `<div class="table-meta muted">A mostrar ${start}–${end} de ${meta.total||rows.length} participantes.</div><div class="table-wrap"><table><thead><tr><th>N.º inscrição</th><th>Participante</th><th>Distrito / Igreja</th><th>Categoria</th><th>Pagamento</th><th>Inscrição</th><th>Acções</th></tr></thead><tbody>${rows.map(r=>`<tr><td><strong>${UI.escape(r.numero_inscricao)}</strong></td><td><strong>${UI.escape(r.nome_completo)}</strong><br><small>${UI.escape(r.telefone||'')}</small></td><td>${UI.escape(r.distrito_nome||'—')}<br><small>${UI.escape(r.igreja_nome||'—')}</small></td><td>${UI.escape(r.categoria_nome||r.id_categoria||'—')}</td><td>${UI.status(r.estado_pagamento)}<br><small>${UI.money(r.total_pago)} / ${UI.money(r.total_devido)}</small></td><td>${UI.status(r.estado_inscricao)}</td><td><div class="actions"><button class="btn btn-secondary btn-sm edit-participant" data-id="${r.id_inscricao}">Editar</button>${r.estado_inscricao!=='PRESENTE'?`<button class="btn btn-primary btn-sm checkin-participant" data-id="${r.id_inscricao}">Check-in</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>${participantPager_(meta)}`;
+}
+
+function participantPager_(meta={}){
+  if(!meta.pages || meta.pages<=1)return '';
+  return `<div class="pager"><button class="btn btn-secondary btn-sm participant-page" data-page="${Math.max(1,(meta.page||1)-1)}" ${meta.page<=1?'disabled':''}>Anterior</button><span class="muted">Página ${meta.page} de ${meta.pages}</span><button class="btn btn-secondary btn-sm participant-page" data-page="${Math.min(meta.pages,(meta.page||1)+1)}" ${meta.page>=meta.pages?'disabled':''}>Seguinte</button></div>`;
 }
 
 function bindParticipantActions(){
   document.querySelectorAll('.edit-participant').forEach(b=>b.onclick=()=>participantModal(App.state.participants.find(x=>x.id_inscricao===b.dataset.id)));
-  document.querySelectorAll('.checkin-participant').forEach(b=>b.onclick=async()=>{await Api.request('participants.checkin',{id_inscricao:b.dataset.id});UI.toast('Check-in registado.');App.render('participants');});
+  document.querySelectorAll('.checkin-participant').forEach(b=>b.onclick=async()=>{await Api.request('participants.checkin',{id_inscricao:b.dataset.id});UI.toast('Check-in registado.');App.clearCache&&App.clearCache('lookups');App.render('participants',{forceRefresh:true});});
+  document.querySelectorAll('.participant-page').forEach(b=>b.onclick=()=>{const f=App.state.participantFilters||{};reloadParticipants(f.search||'',f.estado_inscricao||'',Number(b.dataset.page||1));});
 }
 
 function participantModal(p={}){

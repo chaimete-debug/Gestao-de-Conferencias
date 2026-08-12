@@ -1,6 +1,6 @@
 window.Views = window.Views || {};
 
-Views.dashboard = async function () {
+Views.dashboard = async function (options = {}) {
   const conferenceId = App.state.conferenceId;
   if (!conferenceId) {
     App.container.innerHTML = `<div class="card panel"><h3>Nenhuma conferência seleccionada</h3><p class="muted">Crie ou seleccione uma conferência para visualizar o painel operacional.</p>${Auth.can('conferencias.gerir')?'<button class="btn btn-primary" id="dashboard-create-conference">Abrir Conferência</button>':''}</div>`;
@@ -9,7 +9,7 @@ Views.dashboard = async function () {
     return;
   }
 
-  const data = await Api.request('dashboard.get', { id_conferencia: conferenceId });
+  const data = await Api.request('dashboard.get', { id_conferencia: conferenceId, force_refresh: Boolean(options.forceRefresh) });
   const k = data.kpis || {};
   const conference = data.conference || App.state.currentConference || {};
   const quickActions = dashboardQuickActions_();
