@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cmnm-v14-bilinguismo-v27';
+const CACHE_NAME = 'cmnm-v15-performance-v271';
 const ASSETS = [
   './',
   './index.html',
